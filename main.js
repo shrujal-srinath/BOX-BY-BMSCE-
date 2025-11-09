@@ -1,13 +1,13 @@
 /* ================== GLOBAL STATE & UTILS ================== */
+import { db, auth } from './modules/firebase.js';
 
 // The main application container
 const appContainer = document.getElementById('app-container');
-let currentSportModule = null; // To hold the loaded sport logic
+let currentSportModule = null;
+let globalUser = null;
 
 /**
  * Utility: Gets an element by its ID
- * @param {string} id
- * @returns {HTMLElement}
  */
 function $(id) {
     return document.getElementById(id);
@@ -15,8 +15,6 @@ function $(id) {
 
 /**
  * Utility: Gets all elements by a selector
- * @param {string} selector
- * @returns {NodeListOf<HTMLElement>}
  */
 function $$(selector) {
     return document.querySelectorAll(selector);
@@ -24,42 +22,31 @@ function $$(selector) {
 
 /**
  * Utility: Shows a toast notification
- * @param {string} message
- * @param {'info' | 'success' | 'warning' | 'error'} type
- * @param {number} duration
  */
 function showToast(message, type = 'info', duration = 2000) {
     const container = $('toastContainer');
     if (!container) return;
-
     const toast = document.createElement('div');
     let size = 'small';
     if (type === 'warning' || message.length > 30) size = 'medium';
     if (type === 'error' || message.length > 50) size = 'large';
-    
     toast.className = `toast ${type} ${size}`;
     toast.innerHTML = `<span class="toast-message">${message}</span>`;
-    
     container.appendChild(toast);
-    
     setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
         }, 300);
     }, duration);
 }
 
 /**
  * Utility: Copies text to the clipboard
- * @param {string} text
  */
 async function copyToClipboard(text) {
     console.log('Copying to clipboard:', text);
-    
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(text);
@@ -69,8 +56,6 @@ async function copyToClipboard(text) {
             console.warn('Clipboard API failed, using fallback:', err);
         }
     }
-    
-    // Fallback for insecure contexts (like 127.0.0.1 without HTTPS)
     try {
         const textArea = document.createElement('textarea');
         textArea.value = text;
@@ -80,10 +65,8 @@ async function copyToClipboard(text) {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
-        
         if (successful) {
             showToast('Game code copied!', 'success', 1500);
         } else {
@@ -95,8 +78,7 @@ async function copyToClipboard(text) {
     }
 }
 
-// Make utilities globally available for sport modules to use
-// This is a simple way to provide shared functionality
+// Make utilities globally available
 window.utils = {
     $,
     $$,
@@ -107,21 +89,16 @@ window.utils = {
 /* ================== APP INITIALIZATION ================== */
 
 /**
- * Loads and initializes the correct sport module based on the URL
+ * Loads and initializes the correct sport module
  */
-async function initializeApp() {
+async function loadSportModule(urlParams, user) {
     try {
-        // 1. Get the sport from the URL query parameter
-        const urlParams = new URLSearchParams(window.location.search);
         const sportName = urlParams.get('sport');
-
         if (!sportName) {
-            appContainer.innerHTML = '<h1>No sport selected. Please go back to the home page.</h1>';
+            appContainer.innerHTML = '<h1>No sport selected. Please go back.</h1>';
             return;
         }
 
-        // 2. Dynamically import the correct module
-        // This uses the 'sportName' variable to build the file path
         const sportModule = await import(`./sports/${sportName}.js`);
         
         if (!sportModule || !sportModule.default) {
@@ -129,18 +106,12 @@ async function initializeApp() {
         }
 
         currentSportModule = sportModule.default;
-
-        // 3. Set the page title
         document.title = `${currentSportModule.sportName} Scoreboard`;
-
-        // 4. Build the initial HTML for the sport
-        // The module provides the HTML, main.js just injects it
         appContainer.innerHTML = currentSportModule.buildHtml();
 
-        // 5. Initialize the sport module
-        // This tells the module to attach all its event listeners
-        // We pass it the utilities so it can use them
-        currentSportModule.init(window.utils);
+        // Initialize the sport module
+        // Pass the user object (or null) and all URL params
+        currentSportModule.init(window.utils, user, urlParams);
         
         console.log(`Successfully initialized ${currentSportModule.sportName} module.`);
 
@@ -158,4 +129,13 @@ async function initializeApp() {
 }
 
 // Start the application when the DOM is ready
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // This runs auth check *first*
+    auth.onAuthStateChanged(user => {
+        // Once we know the user status, load the module
+        // This ensures the module's init() has the user object
+        loadSportModule(urlParams, user);
+    });
+});

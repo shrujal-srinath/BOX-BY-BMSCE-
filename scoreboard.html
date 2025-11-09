@@ -9,8 +9,86 @@
 </head>
 <body>
     
-    <div class="app-container" id="app-container">
+    <header class="control-header" id="global-header" style="display: none; border-radius: 0;">
+        <div class="control-title">
+            <h2 id="global-user-email">Welcome!</h2>
         </div>
+        <div class="control-actions">
+            <button id="globalSignOutBtn" class="btn btn--secondary">Sign Out</button>
+        </div>
+    </header>
+
+    <div id="root-container">
+
+        <section id="login-watch-view" class="view" style="padding-top: 50px;">
+            <div class="container" style="max-width: 800px;">
+                
+                <header class="homepage-header" style="padding: 0 0 32px 0;">
+                    <h1 class="main-title" style="font-size: 3rem; margin-bottom: 8px;">BOX BY BMSCE</h1>
+                    <p class="hero-subtitle" style="font-size: 1.5rem; margin: 0;">LIVE COLLEGE SCORING APP</p>
+                </header>
+
+                <div class="auth-grid-container">
+                    
+                    <div class="card landing-card auth-grid-watch">
+                        <div class="card__body">
+                            <h3 style="margin-bottom: 12px;">WATCH LIVE GAME</h3>
+                            <div class="form-group">
+                                <label for="globalWatchCode" class="form-label">( ENTER GAME CODE )</label>
+                                <input id="globalWatchCode" class="form-control" placeholder="6-digit code" maxlength="6">
+                            </div>
+                            <div id="globalCodeValidationMessage" class="validation-message hidden"></div>
+                            <button id="globalWatchBtn" class="btn btn--primary btn--full-width" disabled>Watch</button>
+                        </div>
+                    </div>
+
+                    <div class="card landing-card auth-grid-host">
+                        <div class="card__body">
+                            <h3 style="margin-bottom: 12px;">HOST GAME</h3>
+                            <p class="form-label" style="text-align: center; margin-bottom: 16px;">( GOOGLE ACCOUNT )</p>
+                            
+                            <div id="login-form-container">
+                                <div class="form-group">
+                                    <label for="globalEmail">Email</label>
+                                    <input id="globalEmail" type="email" class="form-control" placeholder="host@email.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="globalPassword">Password</label>
+                                    <input id="globalPassword" type="password" class="form-control" placeholder="Min. 6 characters">
+                                </div>
+                                <div class="auth-buttons" style="display: flex; gap: 8px; margin-top: 24px;">
+                                    <button id="globalLoginBtn" class="btn btn--primary" style="flex: 1;">SIGN IN</button>
+                                    <button id="globalSignupBtn" class="btn btn--secondary" style="flex: 1;">SIGN UP</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card landing-card auth-grid-free">
+                        <div class="card__body">
+                            <h3 style="margin-bottom: 12px;">FREE HOST</h3>
+                            <p class="form-label" style="text-align: center; margin-bottom: 16px;">( GAME WONT BE SAVED )</p>
+                            <button id="globalFreeHostBtn" class="btn btn--secondary btn--full-width">Host as Guest</button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="card landing-card" style="margin-top: 24px;">
+                    <div class="card__body" style="text-align: center;">
+                        <button class="btn btn--outline" style="width: 100%; max-width: 400px;">
+                            RESULTS OF PREV GAMES (1/10) &gt;&gt;
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <div class="app-container" id="app-container" style="min-height: auto; display: none;">
+            </div>
+
+    </div>
 
     <div id="toastContainer" class="toast-container"></div>
 

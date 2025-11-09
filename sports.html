@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOX : Select Sport</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container homepage-container">
+        <div class="container">
+
+            <header class="homepage-header">
+                <div class="basketball-icon">🏆</div>
+                <h1 class="main-title">Select a Sport</h1>
+                <p class="hero-subtitle" id="welcome-message">Loading...</p>
+            </header>
+
+            <div class="sport-selection">
+                <div class="sport-selection-grid" id="sport-grid">
+                    <a href="#" data-sport="basketball" class="sport-card-link">
+                        <div class="card sport-card">
+                            <div class="card__body">
+                                <div class="card-icon">🏀</div>
+                                <h3>Basketball</h3>
+                                <p>Live scoreboard, stats, and shot clock management.</p>
+                            </div>
+                        </div>
+                    </a>
+
+                    <a href="#" data-sport="kabaddi" class="sport-card-link">
+                        <div class="card sport-card">
+                            <div class="card__body">
+                                <div class="card-icon">🏃‍♂️</div>
+                                <h3>Kabaddi</h3>
+                                <p>Raid timer, score, and all-out tracking.</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="#" data-sport="volleyball" class="sport-card-link">
+                        <div class="card sport-card">
+                            <div class="card__body">
+                                <div class="card-icon">🏐</div>
+                                <h3>Volleyball</h3>
+                                <p>Point, set, and timeout tracking.</p>
+                            </div>
+                        </div>
+                    </a>
+
+                    <a href="#" data-sport="badminton" class="sport-card-link">
+                        <div class="card sport-card">
+                            <div class="card__body">
+                                <div class="card-icon">🏸</div>
+                                <h3>Badminton</h3>
+                                <p>Point, game, and match tracking.</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="#" data-sport="general" class="sport-card-link">
+                        <div class="card sport-card">
+                            <div class="card__body">
+                                <div class="card-icon">⭐</div>
+                                <h3>General Points</h3>
+                                <p>A simple +1 / -1 point system for any event.</p>
+                            </div>
+                        </div>
+                    </a>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // This script updates the links based on the user's mode
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode'); // 'watch', 'host', or 'free'
+            const code = urlParams.get('code'); // e.g., '123456'
+            const welcomeMsg = document.getElementById('welcome-message');
+
+            let baseUrl = 'scoreboard.html';
+            
+            if (mode === 'watch' && code) {
+                welcomeMsg.textContent = `You are watching game ${code}. Select the sport.`;
+                baseUrl = `scoreboard.html?watch=${code}`;
+            } else if (mode === 'host') {
+                welcomeMsg.textContent = 'You are logged in. Select a sport to host.';
+                baseUrl = 'scoreboard.html?host=true'; // Pass host status
+            } else if (mode === 'free') {
+                welcomeMsg.textContent = 'You are hosting as a guest. Select a sport.';
+                baseUrl = 'scoreboard.html?host=free'; // Pass free host status
+            } else {
+                // No mode, send back to index
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Update all sport links
+            document.querySelectorAll('.sport-card-link').forEach(link => {
+                const sport = link.dataset.sport;
+                link.href = `${baseUrl}&sport=${sport}`;
+            });
+        });
+    </script>
+</body>
+</html>

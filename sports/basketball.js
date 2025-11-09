@@ -1,17 +1,19 @@
 // This file exports ONE object: the 'basketball' module.
 
 // Import the firebase services we need
-import { db, auth } from '../modules/firebase.js';
+import { db } from '../modules/firebase.js';
 
 // Get access to the global utilities from main.js
-const { $, $$, showToast, copyToClipboard } = window.utils;
+let $;
+let $$;
+let showToast;
+let copyToClipboard;
 
 // ================== MODULE-SPECIFIC STATE ==================
 const state = {
-    view: 'landing',
-    isHost: false, // This will be set on init
-    isFreeHost: false,
-    user: null, 
+    view: 'landing', // Default view
+    isHost: false,
+    user: null, // Will be set by init
     gameCode: null,
     game: null,
     gameType: 'friendly',
@@ -30,31 +32,38 @@ const state = {
 function buildHtml() {
     return `
     <section id="landing-view" class="view">
-        <div class="container">
-            <header class="landing-header">
+        <div class="container" style="max-width: 840px; padding-top: 50px;">
+            <header class="landing-header" style="margin-bottom: 24px;">
                 <div class="basketball-icon">🏀</div>
                 <h1 class="main-title">Basketball Scoreboard</h1>
-                <p class="hero-subtitle">Host a new game or enter a code to watch.</p>
             </header>
 
-            <div class="landing-cards">
+            <div class="setup-grid">
                 <div class="card landing-card">
                     <div class="card__body">
                         <div class="card-icon">👁️</div>
                         <h3>Watch Game</h3>
-                        <p>Enter a game code to spectate</p>
-                        <input id="watchCodeInput" class="form-control" placeholder="Enter 6-digit code" maxlength="6">
-                        <div id="codeValidationMessage" class="validation-message hidden"></div>
-                        <button id="watchGameBtn" class="btn btn--primary btn--full-width" disabled>Watch Game</button>
+                        <p>Enter a 6-digit code to spectate.</p>
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label for="watchCodeInput" class="form-label">Game Code</label>
+                            <input id="watchCodeInput" class="form-control" placeholder="e.g., 123456" maxlength="6">
+                        </div>
+                        <div id="watchCodeValidation" class="validation-message hidden"></div>
+                        <button id="watchGameBtn" class_name="btn btn--primary btn--full-width" disabled>Watch Game</button>
                     </div>
                 </div>
 
-                <div class="card landing-card" id="host-card">
+                <div class="card landing-card">
                     <div class="card__body">
                         <div class="card-icon">🎯</div>
                         <h3>Host Game</h3>
-                        <div id="host-container">
-                            </div>
+                        <p>Enter a 6-digit code for your game.</p>
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label for="hostCodeInput" class="form-label">New Game Code</label>
+                            <input id="hostCodeInput" class="form-control" placeholder="Leave empty for random code" maxlength="6">
+                        </div>
+                        <div id="hostCodeValidation" class="validation-message hidden"></div>
+                        <button id="hostGameBtn" class="btn btn--primary btn--full-width">Host New Game</button>
                     </div>
                 </div>
             </div>
@@ -68,9 +77,9 @@ function buildHtml() {
                     <h2>Game Configuration</h2>
                     <p>Set up your game parameters</p>
                 </div>
-                <div class="game-code-display">
+                 <div class="game-code-display">
                     <span class="status status--info">
-                        Game Code: <span id="configGameCode">000000</span>
+                        Game Code: <span id="configGameCode">...</span>
                     </span>
                     <button id="copyConfigCode" class="btn btn--outline btn--sm">Copy</button>
                 </div>
@@ -78,7 +87,7 @@ function buildHtml() {
             <div class="config-grid">
                 <div class="card">
                     <div class="card__body">
-                        <h3>Game Type</h3>
+                        <h3>1. Game Type</h3>
                         <div class="game-type-selection">
                             <label class="game-type-option">
                                 <input type="radio" name="gameType" value="friendly" checked>
@@ -101,7 +110,7 @@ function buildHtml() {
                 </div>
                 <div class="card">
                     <div class="card__body">
-                        <h3>Game Settings</h3>
+                        <h3>2. Game Settings</h3>
                         <div class="form-group">
                             <label class="form-label" for="gameNameInput">Game Name</label>
                             <input id="gameNameInput" class="form-control" placeholder="Championship Final" maxlength="50">
@@ -135,7 +144,7 @@ function buildHtml() {
                 </div>
                 <div class="card">
                     <div class="card__body">
-                        <h3>Team Configuration</h3>
+                        <h3>3. Team Configuration</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="teamAName">Team A Name</label>
@@ -166,7 +175,7 @@ function buildHtml() {
                 </div>
             </div>
             <div class="section-actions">
-                <button id="backToLandingFromConfig" class="btn btn--outline">← Back to Landing</button>
+                <button id="backToLanding" class="btn btn--outline">← Back</button>
                 <button id="proceedToSetup" class="btn btn--primary">Continue</button>
             </div>
         </div>
@@ -181,7 +190,7 @@ function buildHtml() {
                 </div>
                 <div class="game-code-display">
                     <span class="status status--info">
-                        Game Code: <span id="setupGameCode">000000</span>
+                        Game Code: <span id="setupGameCode">...</span>
                     </span>
                     <button id="copySetupCode" class="btn btn--outline btn--sm">Copy</button>
                 </div>
@@ -218,29 +227,29 @@ function buildHtml() {
                             </div>
                         </div>
                     </div>
-                    <div class="card team-setup-card">
-                        <div class="card__body">
-                            <h3 id="teamBSetupTitle">Team B</h3>
-                            <div class="player-form">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <input id="teamBPlayerNumber" class="form-control" type="number" min="0" max="99" placeholder="Jersey #">
-                                    </div>
-                                    <div class="form-group">
-                                        <input id="teamBPlayerName" class="form-control" placeholder="Player Name" maxlength="30">
-                                    </div>
-                                    <div class="form-group">
-                                        <select id="teamBPlayerPosition" class="form-control">
-                                            <option value="">Position</option>
-                                            <option value="PG">PG</option>
-                                            <option value="SG">SG</option>
-                                            <option value="SF">SF</option>
-                                            <option value="PF">PF</option>
-                                            <option value="C">C</option>
-                                        </select>
-                                    </div>
-                                    <button id="addTeamBPlayer" class="btn btn--primary">Add</button>
+                </div>
+                <div class="card team-setup-card">
+                    <div class="card__body">
+                        <h3 id="teamBSetupTitle">Team B</h3>
+                        <div class="player-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <input id="teamBPlayerNumber" class="form-control" type="number" min="0" max="99" placeholder="Jersey #">
                                 </div>
+                                <div class="form-group">
+                                    <input id="teamBPlayerName" class="form-control" placeholder="Player Name" maxlength="30">
+                                </div>
+                                <div class="form-group">
+                                    <select id="teamBPlayerPosition" class="form-control">
+                                        <option value="">Position</option>
+                                        <option value="PG">PG</option>
+                                        <option value="SG">SG</option>
+                                        <option value="SF">SF</option>
+                                        <option value="PF">PF</option>
+                                        <option value="C">C</option>
+                                    </select>
+                                </div>
+                                <button id="addTeamBPlayer" class="btn btn--primary">Add</button>
                             </div>
                         </div>
                         <div id="teamBRoster" class="roster-list" style="padding: 0 16px;"></div>
@@ -250,6 +259,7 @@ function buildHtml() {
                             </div>
                         </div>
                     </div>
+                </div>
             </div>
             <div class="section-actions">
                 <button id="backToConfig" class="btn btn--outline">← Back to Configuration</button>
@@ -266,13 +276,11 @@ function buildHtml() {
                     <h2 id="gameNameDisplay">Basketball Game</h2>
                     <div class="game-code-display">
                         <span class="status status--info">
-                            Game Code: <span id="controlGameCode">000000</span>
+                            Game Code: <span id="controlGameCode">...</span>
                         </span>
                         <button id="copyControlCode" class="btn btn--outline btn--sm">Copy</button>
                     </div>
                 </div>
-                <div class="control-actions" id="control-actions">
-                    </div>
             </header>
             <div class="control-grid">
                 <div class="scoreboard-section">
@@ -394,6 +402,7 @@ function buildHtml() {
                                         <option value="teamA">Team A</option>
                                         <option value="teamB">Team B</option>
                                     </select>
+                                    <button id="exportGame" class="btn btn--outline btn--sm">Export</button>
                                 </div>
                             </div>
                             <div class="player-scoring-grid" id="playerScoringGrid"></div>
@@ -531,10 +540,8 @@ function showView(viewName) {
         if (element) {
             if (view === viewName) {
                 element.classList.remove('hidden');
-                element.style.display = 'block';
             } else {
                 element.classList.add('hidden');
-                element.style.display = 'none';
             }
         }
     });
@@ -549,8 +556,6 @@ function showView(viewName) {
         }
         stopMasterTimer();
     }
-    
-    console.log(`✓ Successfully switched to ${viewName} view`);
 }
 
 function playShotClockViolationBuzzer() {
@@ -645,7 +650,7 @@ function startMasterTimer() {
 
         if (!state.game.gameState.gameRunning && !state.game.gameState.shotClockRunning) {
             stopMasterTimer();
-            if (state.view === 'control') updateMasterStartButton();
+            if (state.view === 'control' && $('startGameBtn')) updateMasterStartButton();
         }
     }, 1000);
 }
@@ -655,11 +660,11 @@ function stopMasterTimer() {
         clearInterval(state.timers.masterTimer);
         state.timers.masterTimer = null;
     }
-    if (state.view === 'control') updateMasterStartButton();
+    if (state.view === 'control' && $('startGameBtn')) updateMasterStartButton();
 }
 
 function toggleMasterGame() {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     
     if (state.game.gameState.gameRunning || state.game.gameState.shotClockRunning) {
         state.game.gameState.gameRunning = false;
@@ -693,7 +698,7 @@ function updateMasterStartButton() {
 }
 
 function resetAllClocks() {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     state.game.gameState.gameTime.minutes = state.game.settings.periodDuration;
     state.game.gameState.gameTime.seconds = 0;
     
@@ -716,7 +721,7 @@ function removeShotClockWarning() {
 }
 
 function resetShotClockTo14() {
-    if (!state.game || state.game.settings.shotClockDuration === 0) return;
+    if (!state.game || !state.isHost || state.game.settings.shotClockDuration === 0) return;
     state.game.gameState.shotClock = 14;
     removeShotClockWarning();
     updateControlDisplay();
@@ -725,7 +730,7 @@ function resetShotClockTo14() {
 }
 
 function resetShotClockTo24() {
-    if (!state.game || state.game.settings.shotClockDuration === 0) return;
+    if (!state.game || !state.isHost || state.game.settings.shotClockDuration === 0) return;
     state.game.gameState.shotClock = 24;
     removeShotClockWarning();
     updateControlDisplay();
@@ -738,6 +743,7 @@ function handle24sResetKey(event) {
         event.key === 'Enter' &&
         state.view === 'control' &&
         !state.clockEditing &&
+        state.isHost &&
         document.activeElement.tagName !== 'INPUT' &&
         document.activeElement.tagName !== 'TEXTAREA'
     ) {
@@ -746,7 +752,7 @@ function handle24sResetKey(event) {
 }
 
 function startShotClockOnly() {
-    if (!state.game || state.game.settings.shotClockDuration === 0) return;
+    if (!state.game || !state.isHost || state.game.settings.shotClockDuration === 0) return;
     if (state.game.gameState.shotClock <= 0) {
         showToast('Reset shot clock first', 'warning', 2000);
         return;
@@ -759,6 +765,7 @@ function startShotClockOnly() {
 }
 
 function showEditClockModal() {
+    if (!state.isHost) return;
     const modal = $('editClockModal');
     const editMinutes = $('editMinutes');
     const editSeconds = $('editSeconds');
@@ -785,6 +792,7 @@ function showEditClockModal() {
 }
 
 function showEditShotClockModal() {
+    if (!state.isHost) return;
     const modal = $('editShotClockModal');
     const editShotClockSeconds = $('editShotClockSeconds');
     if (!modal || !state.game || state.game.settings.shotClockDuration === 0) return;
@@ -809,12 +817,10 @@ function showEditShotClockModal() {
 }
 
 function createGameSkeleton(code, config = {}) {
-    // This is where we add the hostId for security!
-    // If it's a free host, hostId will be null.
-    const hostId = (state.user && !state.isFreeHost) ? state.user.uid : null;
+    const hostId = state.user ? state.user.uid : null;
     
     return {
-        hostId: hostId, // NEW: For security rules
+        hostId: hostId,
         code: code,
         gameType: state.gameType,
         settings: {
@@ -857,10 +863,10 @@ function createGameSkeleton(code, config = {}) {
 }
 
 async function saveGameState() {
-    // If in "free host" mode, do not save to Firebase.
-    if (state.isFreeHost) return; 
+    // Only save if logged in
+    if (!state.user || !state.isHost) return; 
 
-    if (state.game && state.gameCode && db && state.isHost) {
+    if (state.game && state.gameCode && db) {
         try {
             state.game.lastUpdate = Date.now();
             await db.collection('games').doc(state.gameCode).set(state.game);
@@ -945,50 +951,105 @@ function updateTopScorerDisplay() {
 }
 
 // ================== AUTH FUNCTIONS (REMOVED) ==================
-// All auth functions (handleSignUp, handleLogin, etc.)
-// have been moved to home.js! This file is now clean.
 
 // ================== EVENT HANDLERS ==================
 
-function handleCreateGame(event) {
-    console.log('✓ handleCreateGame called');
-    event.preventDefault();
-    
-    // We are already a host (either free or logged in)
-    // if we can see the "Create Game" button.
-    
-    state.gameCode = state.isFreeHost ? "LOCAL" : generateGameCode();
-    
-    console.log('✓ Game code generated:', state.gameCode);
-    showToast('Game created successfully!', 'success', 1500);
-    showConfigurationView();
-}
-
-async function handleWatchGame(event) {
+async function handleWatchGame() {
     console.log('✓ handleWatchGame called');
-    event.preventDefault();
     const code = $('watchCodeInput').value.trim();
-    if (code.length !== 6) {
-        showToast('Enter a valid 6-digit code', 'error', 2000);
-        return;
-    }
     await joinSpectatorMode(code);
 }
 
-async function handleWatchCodeInput(event) {
-    const value = event.target.value.replace(/\D/g, '').slice(0, 6);
-    event.target.value = value;
-    $('watchGameBtn').disabled = value.length !== 6;
-    
-    if (value.length === 6) {
-        await validateGameCode(value);
+async function handleHostGame() {
+    console.log('✓ handleHostGame called');
+    state.isHost = true;
+    let code = $('hostCodeInput').value.trim();
+
+    // Generate default code if empty
+    if (code === "") {
+        code = generateGameCode();
+        showToast(`Generated random code: ${code}`, 'info', 2000);
+    }
+
+    if (code.length !== 6 || !/^\d+$/.test(code)) {
+        showToast('Please enter a valid 6-digit code', 'error', 3000);
+        return;
+    }
+
+    await checkCodeAndProceed(code);
+}
+
+async function checkCodeAndProceed(code) {
+    const validationMsg = $('hostCodeValidation');
+    validationMsg.textContent = 'Checking code...';
+    validationMsg.className = 'validation-message info';
+    validationMsg.classList.remove('hidden');
+
+    const existingGame = await loadGameState(code);
+
+    if (state.user) {
+        // --- Logged-in Host ---
+        if (existingGame) {
+            if (existingGame.hostId === state.user.uid) {
+                // It's THEIR game, let them resume
+                validationMsg.textContent = 'Resuming your existing game...';
+                validationMsg.className = 'validation-message success';
+                showToast('Resuming your existing game...', 'success', 2000);
+                
+                state.game = existingGame;
+                state.gameCode = code;
+                state.gameType = existingGame.gameType;
+
+                if (state.gameType === 'friendly') {
+                    showControlView();
+                } else {
+                    showTeamSetupView(); // Let them review/edit roster
+                }
+
+            } else {
+                // Code is used by SOMEONE ELSE
+                validationMsg.textContent = 'This code is already in use. Try another.';
+                validationMsg.className = 'validation-message error';
+                showToast('Code already in use. Try another.', 'error', 3000);
+                return;
+            }
+        } else {
+            // Logged in host + new code = OK
+            validationMsg.classList.add('hidden');
+            state.gameCode = code;
+            showConfigurationView();
+        }
     } else {
-        $('codeValidationMessage').classList.add('hidden');
+        // --- Free Host ---
+        if (existingGame) {
+            // Free hosts can't resume or overwrite
+            validationMsg.textContent = 'This code is already in use. Try another.';
+            validationMsg.className = 'validation-message error';
+            showToast('Code already in use. Try another.', 'error', 3000);
+            return;
+        } else {
+            // Free host + new code = OK
+            validationMsg.classList.add('hidden');
+            state.gameCode = code;
+            showConfigurationView();
+        }
     }
 }
 
-async function validateGameCode(code) {
-    const message = $('codeValidationMessage');
+async function handleWatchCodeInput() {
+    const value = $('watchCodeInput').value.replace(/\D/g, '').slice(0, 6);
+    $('watchCodeInput').value = value;
+    $('watchGameBtn').disabled = value.length !== 6;
+    
+    if (value.length === 6) {
+        await validateWatchCode(value);
+    } else {
+        $('watchCodeValidation').classList.add('hidden');
+    }
+}
+
+async function validateWatchCode(code) {
+    const message = $('watchCodeValidation');
     if (!message) return;
     message.textContent = 'Checking code...';
     message.className = 'validation-message info';
@@ -1010,15 +1071,16 @@ async function joinSpectatorMode(code) {
     const savedGame = await loadGameState(code);
     if (!savedGame) {
         showToast('Game not found', 'error', 2000);
+        $('watchCodeValidation').textContent = 'Game not found';
+        $('watchCodeValidation').className = 'validation-message error';
+        $('watchCodeValidation').classList.remove('hidden');
         return;
     }
     
     state.gameCode = code;
     state.game = savedGame;
     state.gameType = savedGame.gameType || 'friendly';
-    // Check if we are the host
-    state.isHost = (state.user && state.user.uid === savedGame.hostId); 
-    state.isFreeHost = false; // Cannot watch a "free" game
+    state.isHost = false; // Spectators are never hosts
     
     showSpectatorView();
 }
@@ -1027,12 +1089,6 @@ function showConfigurationView() {
     console.log('✓ Showing configuration view');
     showView('config');
     $('configGameCode').textContent = state.gameCode;
-    
-    // In free mode, hide the "copy code" button
-    if (state.isFreeHost) {
-        $('configGameCode').parentElement.style.display = 'none';
-    }
-    
     setupConfigurationHandlers();
     updateColorPreviews();
 }
@@ -1044,6 +1100,7 @@ function updateColorPreviews() {
 
 function setupConfigurationHandlers() {
     console.log('✓ Setting up configuration handlers');
+    
     $('copyConfigCode').onclick = (e) => { e.preventDefault(); copyToClipboard(state.gameCode); };
     
     $$('input[name="gameType"]').forEach(radio => {
@@ -1056,15 +1113,17 @@ function setupConfigurationHandlers() {
     
     $('teamAColor').onchange = updateColorPreviews;
     $('teamBColor').onchange = updateColorPreviews;
-    
-    $('backToLandingFromConfig').onclick = (e) => { e.preventDefault(); showView('landing'); };
+
+    $('backToLanding').onclick = (e) => { e.preventDefault(); showView('landing'); };
     
     $('proceedToSetup').onclick = (e) => {
         e.preventDefault();
         const config = gatherConfigurationData();
+
         if (validateConfiguration(config)) {
+            // Game code is already set, now we create the game object
             state.game = createGameSkeleton(state.gameCode, config);
-            saveGameState(); // Initial save (will be skipped if free host)
+            saveGameState(); // Initial save
             
             if (state.gameType === 'friendly') {
                 initializeFriendlyGame();
@@ -1086,10 +1145,11 @@ function gatherConfigurationData() {
     }
     
     return {
+        // gameCode is already in state.gameCode
         gameName: $('gameNameInput').value.trim() || 'Basketball Game',
         periodDuration: parseInt($('periodDurationSelect').value || '12'),
         shotClockDuration: shotClockDuration,
-        timeoutsPerTeam: 7, // Default
+        timeoutsPerTeam: 7, 
         teamAName: $('teamAName').value.trim() || 'Team A',
         teamBName: $('teamBName').value.trim() || 'Team B',
         teamAColor: $('teamAColor').value || '#FF6B35',
@@ -1123,12 +1183,6 @@ function showTeamSetupView() {
     console.log('Showing team setup view');
     showView('setup');
     $('setupGameCode').textContent = state.gameCode;
-    
-    // In free mode, hide the "copy code" button
-    if (state.isFreeHost) {
-        $('setupGameCode').parentElement.style.display = 'none';
-    }
-
     updateTeamSetupTitles();
     setupTeamSetupHandlers();
     updateRosterDisplays();
@@ -1231,8 +1285,7 @@ function updateTeamRoster(team) {
         rosterContainer.appendChild(item);
     });
     
-    // Add event listeners for remove buttons
-    $$('.remove-player').forEach(btn => {
+    $$(`#${team}Roster .remove-player`).forEach(btn => {
         btn.onclick = () => {
             removePlayer(btn.dataset.team, parseInt(btn.dataset.index));
         };
@@ -1282,29 +1335,9 @@ function showControlView() {
     console.log('Showing control view');
     showView('control');
     
-    // Set the control buttons based on host type *before* setting handlers
-    const controlActions = $('control-actions');
-    if (controlActions) {
-        if (state.isFreeHost) {
-            controlActions.innerHTML = `
-                <button id="exportGame" class="btn btn--outline">Export</button>
-                <a href="sport-select.html" class="btn btn--secondary">New Sport</a>
-            `;
-        } else if (state.isHost) {
-            controlActions.innerHTML = `
-                <button id="signOutBtn" class="btn btn--secondary">Sign Out</button>
-                <button id="exportGame" class="btn btn--outline">Export</button>
-            `;
-        }
-    }
-
     $('controlGameCode').textContent = state.gameCode;
+    $('copyControlCode').onclick = (e) => { e.preventDefault(); copyToClipboard(state.gameCode); };
     $('gameNameDisplay').textContent = state.game.settings.gameName;
-
-    // In free mode, hide the "copy code" button
-    if (state.isFreeHost) {
-        $('controlGameCode').parentElement.style.display = 'none';
-    }
     
     const shotClockSection = $('shotClockSection');
     const viewerShotClock = $('viewerShotClock');
@@ -1328,15 +1361,12 @@ function showControlView() {
         }
     }
     
-    // Now, set up handlers for the buttons we just created
     setupControlHandlers();
-    
     updateControlDisplay();
     updateMasterStartButton();
     setupAutoSave();
 
-    // Don't listen for updates in "Free Host" mode
-    if (db && state.gameCode && !state.isFreeHost) {
+    if (db && state.user && state.isHost) {
         if (state.firestoreListener) state.firestoreListener();
 
         state.firestoreListener = db.collection('games').doc(state.gameCode)
@@ -1358,7 +1388,6 @@ function showControlView() {
                   }
               } else {
                   showToast('Game session not found', 'error', 3000);
-                  showView('landing');
               }
           }, (error) => {
               console.error("Error in Firestore listener:", error);
@@ -1403,8 +1432,7 @@ function setupPlayerScoringGrid() {
         grid.appendChild(card);
     });
     
-    // Add listeners for new buttons
-    $$('.player-scoring-buttons .btn').forEach(btn => {
+    $$('#playerScoringGrid .player-scoring-buttons .btn').forEach(btn => {
         btn.onclick = () => {
             addPlayerScore(btn.dataset.team, btn.dataset.player, btn.dataset.stat, parseInt(btn.dataset.points));
         };
@@ -1452,7 +1480,7 @@ function setupQuickStatControls() {
 }
 
 function addPlayerScore(team, playerNumber, statType, points) {
-    if (!state.game || !state.game[team].stats[playerNumber]) return;
+    if (!state.game || !state.isHost || !state.game[team].stats[playerNumber]) return;
     const playerStats = state.game[team].stats[playerNumber];
     const playerName = state.game[team].roster.find(p => p.number == playerNumber)?.name || `#${playerNumber}`;
     
@@ -1473,13 +1501,19 @@ function addPlayerScore(team, playerNumber, statType, points) {
 }
 
 function addPlayerStat(team, playerNumber, statType) {
-    if (!state.game || !state.game[team].stats[playerNumber]) return;
+    if (!state.game || !state.isHost || !state.game[team].stats[playerNumber]) return;
     const playerStats = state.game[team].stats[playerNumber];
     const playerName = state.game[team].roster.find(p => p.number == playerNumber)?.name || `#${playerNumber}`;
     
     playerStats[statType]++;
+    
+    if(statType === 'fouls') {
+        state.game[team].fouls++; 
+    }
+    
     setupPlayerScoringGrid();
     updateComprehensiveStatsTable();
+    updateControlDisplay(); 
     saveGameState();
     
     const statNames = {
@@ -1528,43 +1562,42 @@ function updateComprehensiveStatsTable() {
 function setupControlHandlers() {
     console.log('Setting up control handlers');
     
-    // Shared controls
-    if ($('copyControlCode')) $('copyControlCode').onclick = (e) => { e.preventDefault(); copyToClipboard(state.gameCode); };
-    if ($('startGameBtn')) $('startGameBtn').onclick = (e) => { e.preventDefault(); toggleMasterGame(); };
-    if ($('resetAllBtn')) $('resetAllBtn').onclick = (e) => { e.preventDefault(); resetAllClocks(); };
-    if ($('editGameClock')) $('editGameClock').onclick = (e) => { e.preventDefault(); showEditClockModal(); };
-    if ($('gameClockDisplay')) $('gameClockDisplay').onclick = (e) => { e.preventDefault(); showEditClockModal(); };
-    if ($('shotClockDisplay')) $('shotClockDisplay').onclick = (e) => { e.preventDefault(); showEditShotClockModal(); };
-    if ($('editShotClock')) $('editShotClock').onclick = (e) => { e.preventDefault(); showEditShotClockModal(); };
-    if ($('nextPeriod')) $('nextPeriod').onclick = (e) => { e.preventDefault(); nextPeriodFunc(); };
-    if ($('resetShotClock14')) $('resetShotClock14').onclick = (e) => { e.preventDefault(); resetShotClockTo14(); };
-    if ($('resetShotClock24')) $('resetShotClock24').onclick = (e) => { e.preventDefault(); resetShotClockTo24(); };
-    if ($('startShotClock')) $('startShotClock').onclick = (e) => { e.preventDefault(); startShotClockOnly(); };
-    if ($('possessionTeamA')) $('possessionTeamA').onclick = (e) => { e.preventDefault(); setPossession('teamA'); };
-    if ($('possessionTeamB')) $('possessionTeamB').onclick = (e) => { e.preventDefault(); setPossession('teamB'); };
-    if ($('exportGame')) $('exportGame').onclick = (e) => { e.preventDefault(); exportGameData(); };
-
-    // Host-specific controls
-    if ($('signOutBtn')) $('signOutBtn').onclick = (e) => { e.preventDefault(); handleSignOut(); };
-
-    // Score buttons
+    $('startGameBtn').onclick = (e) => { e.preventDefault(); toggleMasterGame(); };
+    $('resetAllBtn').onclick = (e) => { e.preventDefault(); resetAllClocks(); };
+    $('editGameClock').onclick = (e) => { e.preventDefault(); showEditClockModal(); };
+    $('gameClockDisplay').onclick = (e) => { if (state.isHost) showEditClockModal(); };
+    $('shotClockDisplay').onclick = (e) => { if (state.isHost) showEditShotClockModal(); };
+    $('editShotClock').onclick = (e) => { e.preventDefault(); showEditShotClockModal(); };
+    $('nextPeriod').onclick = (e) => { e.preventDefault(); nextPeriodFunc(); };
+    $('resetShotClock14').onclick = (e) => { e.preventDefault(); resetShotClockTo14(); };
+    $('resetShotClock24').onclick = (e) => { e.preventDefault(); resetShotClockTo24(); };
+    $('startShotClock').onclick = (e) => { e.preventDefault(); startShotClockOnly(); };
+    
     $$('.score-btn').forEach(btn => {
         btn.onclick = (e) => {
             e.preventDefault();
+            if (!state.isHost) {
+                showToast('Only the host can control the game', 'warning');
+                return;
+            }
             updateScore(e.target.dataset.team, parseInt(e.target.dataset.points));
         };
     });
-    // Counter buttons
     $$('[data-action]').forEach(btn => {
         btn.onclick = (e) => {
             e.preventDefault();
+            if (!state.isHost) return;
             handleCounterAction(e.target.dataset.action, e.target.dataset.team);
         };
     });
+    
+    $('possessionTeamA').onclick = (e) => { e.preventDefault(); if (!state.isHost) return; setPossession('teamA'); };
+    $('possessionTeamB').onclick = (e) => { e.preventDefault(); if (!state.isHost) return; setPossession('teamB'); };
+    $('exportGame').onclick = (e) => { e.preventDefault(); exportGameData(); };
 }
 
 function nextPeriodFunc() {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     state.game.gameState.period++;
     state.game.gameState.gameTime.minutes = state.game.settings.periodDuration;
     state.game.gameState.gameTime.seconds = 0;
@@ -1581,7 +1614,7 @@ function nextPeriodFunc() {
 }
 
 function updateScore(team, points) {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     state.game[team].score = Math.max(0, state.game[team].score + points);
     showScoreAnimation(points, team);
     updateControlDisplay();
@@ -1629,7 +1662,7 @@ function updateControlDisplay() {
 }
 
 function handleCounterAction(action, team) {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     const [type, operation] = action.split('-');
     const change = operation === 'plus' ? 1 : -1;
     
@@ -1643,7 +1676,7 @@ function handleCounterAction(action, team) {
 }
 
 function setPossession(team) {
-    if (!state.game) return;
+    if (!state.game || !state.isHost) return;
     state.game.gameState.possession = team;
     updatePossessionDisplay();
     saveGameState();
@@ -1729,10 +1762,23 @@ function playerStatsToArray(player, stats) {
 function showSpectatorView() {
     console.log('Showing spectator view');
     showView('viewer');
+
+    // Disable all host controls for spectator
+    $$('.score-btn, .possession-btn, .master-start-btn, .clock-control-row button, .shot-clock-actions button, [data-action]').forEach(btn => {
+        btn.disabled = true;
+    });
+    $$('.clock-display, .shot-clock-display').forEach(el => {
+        el.title = "Spectator View";
+        el.style.cursor = 'default';
+    });
+    // Disable quick stat controls
+    if ($('quickStatPlayer')) $('quickStatPlayer').disabled = true;
+    if ($('statTeamSelect')) $('statTeamSelect').disabled = true;
+
+
     if(state.game) updateSpectatorView();
 
-    // Don't listen for updates in "Free Host" mode
-    if (db && state.gameCode && !state.isFreeHost) {
+    if (db && state.gameCode) {
         if (state.firestoreListener) state.firestoreListener();
         state.firestoreListener = db.collection('games').doc(state.gameCode)
           .onSnapshot((doc) => {
@@ -1748,7 +1794,6 @@ function showSpectatorView() {
                   }
               } else {
                   showToast('Game session has ended', 'error', 3000);
-                  showView('landing');
               }
           }, (error) => {
               console.error("Error in Firestore listener:", error);
@@ -1779,43 +1824,35 @@ function updateSpectatorView() {
 
 function setupAutoSave() {
     if (state.timers.autoSave) clearInterval(state.timers.autoSave);
-    // Don't auto-save in "Free Host" mode
-    if (state.isHost && !state.isFreeHost) {
+    if (state.isHost && state.user) {
         state.timers.autoSave = setInterval(saveGameState, 30000);
     }
 }
 
 // ================== INITIALIZER (CALLED BY MAIN.JS) ==================
-
-function init() {
+/**
+ * @param {object} utils - The global utilities from main.js
+ * @param {firebase.User | null} user - The authenticated user (or null)
+ */
+function init(utils, user) {
     console.log('Basketball module initializing...');
     
-    // Check auth state *from this page*
-    // This runs AFTER the global login on index.html
-    state.user = auth.currentUser;
-    state.isHost = localStorage.getItem('userIsHost') === 'true';
-    state.isFreeHost = localStorage.getItem('userMode') === 'free';
-    
-    // Update the host UI based on the status
-    const hostContainer = $('host-container');
-    if (state.isHost || state.isFreeHost) {
-        hostContainer.innerHTML = `
-            <p>You are a host. Create a new game to get started.</p>
-            <button id="createGameBtn" class="btn btn--primary btn--full-width">Create New Game</button>
-        `;
-        $('createGameBtn').addEventListener('click', handleCreateGame);
-    } else {
-        // This shouldn't be reachable if home.js works, but it's a good fallback.
-        hostContainer.innerHTML = `
-            <p>Please <a href="index.html">go back to the home page</a> to sign in or start a free session.</p>
-        `;
-    }
+    $ = utils.$;
+    $$ = utils.$$;
+    showToast = utils.showToast;
+    copyToClipboard = utils.copyToClipboard;
 
-    // Add landing page event listeners
+    state.user = user; // Set user state (null if not logged in)
+    
+    // Add event listeners
     $('watchGameBtn').addEventListener('click', handleWatchGame);
     $('watchCodeInput').addEventListener('input', handleWatchCodeInput);
+    $('hostGameBtn').addEventListener('click', handleHostGame);
+    $('hostCodeInput').addEventListener('input', (e) => {
+        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+        e.target.value = value;
+    });
     
-    // Add keydown listener
     document.addEventListener('keydown', handle24sResetKey);
 
     // Show the initial view
